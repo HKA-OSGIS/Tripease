@@ -82,21 +82,30 @@
       const [whenToEat, setWhenToEat] = React.useState("");
       const [tripDetails, setTripDetails] = React.useState({ distance: "", time: "" });
       const mapRef = React.useRef(null);
+      const routingControlRef = React.useRef(null);
 
-      // Function to initialize the map and add route
-      const initializeMap = async () => {
-        if (mapRef.current) {
-          mapRef.current.remove(); // Clear existing map instance
-        }
-
-        // Create map instance
-        mapRef.current = L.map('map').setView([48.8566, 2.3522], 6); // Centered on France
+      React.useEffect(() => {
+        // Initialize the map
+        mapRef.current = L.map('map').setView([48.8566, 2.3522], 6);
 
         // Add OpenStreetMap tiles
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
           attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
         }).addTo(mapRef.current);
+
+        return () => {
+          // Cleanup the map instance when component unmounts
+          if (mapRef.current) {
+            mapRef.current.remove();
+          }
+        };
+      }, []);
+
+      const initializeRoute = async () => {
+        if (routingControlRef.current) {
+          mapRef.current.removeControl(routingControlRef.current); // Clear existing route
+        }
 
         try {
           // Geocode start and end points
@@ -111,19 +120,36 @@
           const endCoords = await geocode(endPoint);
 
           // Add route
-          const routingControl = L.Routing.control({
+          routingControlRef.current = L.Routing.control({
             waypoints: [
               L.latLng(startCoords.lat, startCoords.lng),
               L.latLng(endCoords.lat, endCoords.lng)
-            ],
-            routeWhileDragging: true
+            ],routeWhileDragging: true,
+            show: false,
           }).addTo(mapRef.current);
 
-          routingControl.on('routesfound', function (e) {
+          routingControlRef.current.on('routesfound', function (e) {
             const route = e.routes[0];
             const distance = (route.summary.totalDistance / 1000).toFixed(2); // Convert to km
-            const time = (route.summary.totalTime / 3600).toFixed(2); // Convert to hours
-            setTripDetails({ distance, time });
+            const time = route.summary.totalTime / 3600; // Travel time in hours as a decimal
+
+            // Format travel time as "XhYY"
+            const travelHours = Math.floor(time); // Whole hours
+            const travelMinutes = Math.round((time - travelHours) * 60); // Remaining minutes
+            const formattedTime = `${travelHours}h${String(travelMinutes).padStart(2, '0')}`;
+
+            // Parse departureTime as "HH:MM"
+            const [hours, minutes] = departureTime.split(':').map(Number);
+
+            // Calculate arrival time in total minutes
+            const totalMinutes = hours * 60 + minutes + time * 60;
+            const arriveHours = Math.floor(totalMinutes / 60) % 24; // Modulo 24 for 24-hour time
+            const arriveMinutes = Math.round(totalMinutes % 60);
+
+            // Format arrival time as "XhYY"
+            const formattedArrival = `${arriveHours}h${String(arriveMinutes).padStart(2, '0')}`;
+
+            setTripDetails({ distance, time: formattedTime, arrive: formattedArrival });
           });
         } catch (error) {
           alert(error);
@@ -163,7 +189,7 @@
                 onChange={(e) => setCuisineType(e.target.value)}
               >
                 <option value="" disabled>Select cuisine</option>
-                <option value="Fast-Food">Italian</option>
+                <option value="Fast-Food">Fast-Food</option>
                 <option value="Italian">Italian</option>
                 <option value="Chinese">Chinese</option>
                 <option value="Indian">Indian</option>
@@ -191,7 +217,7 @@
               />
             </div>
 
-            <button className="goButton" onClick={initializeMap}>
+            <button className="goButton" onClick={initializeRoute}>
               GO
             </button>
 
@@ -199,6 +225,7 @@
               <div className="tripDetails">
                 <p>Distance: {tripDetails.distance} km</p>
                 <p>Estimated time: {tripDetails.time} hours</p>
+                <p>Estimated time of arrival: {tripDetails.arrive} hours</p>
               </div>
             )}
           </div>
