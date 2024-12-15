@@ -1,98 +1,215 @@
-<!DOCTYPE HTML>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
-    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-    <style>
-      html, body {
-        height: 100%;
-        padding: 0;
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-      }
-      #controls {
-        padding: 10px;
-        background-color: #f9f9f9;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-        z-index: 1000;
-      }
-      #map {
-        flex: 1;
-        width: 100%;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="controls">
-      <label>
-        StartingPoint : 
-        <input type="text" id="start"/>
-      </label>
-      <label>
-        EndPoint : 
-        <input type="text" id="end"/>
-      </label>
-      <button id="calculateRoute">Itinéraire</button>
-    </div>
-    <div id="map"></div>
-    <script>
-      // Initialize the map
-      var map = L.map('map').setView([48.8566, 2.3522], 6); // Centré sur la France
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TripEase</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, sans-serif;
+    }
+    #root {
+      height: 100%;
+    }
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+    .container {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 300px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+    }
+    .inputContainer {
+      margin-bottom: 10px;
+    }
+    .label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    .input {
+      width: 100%;
+      padding: 8px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+    .goButton {
+      margin-top: 10px;
+      padding: 8px 20px;
+      border-radius: 5px;
+      background-color: #4CAF50;
+      color: #fff;
+      font-size: 14px;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+    }
+    .tripDetails {
+      margin-top: 10px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
 
-      // Add OpenStreetMap tiles
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
-      }).addTo(map);
+  <script type="text/babel">
+    const RoutingApp = () => {
+      const [startPoint, setStartPoint] = React.useState("");
+      const [endPoint, setEndPoint] = React.useState("");
+      const [cuisineType, setCuisineType] = React.useState("");
+      const [departureTime, setDepartureTime] = React.useState("");
+      const [whenToEat, setWhenToEat] = React.useState("");
+      const [tripDetails, setTripDetails] = React.useState({ distance: "", time: "" });
+      const mapRef = React.useRef(null);
 
-      // Routing control variable
-      var routingControl;
+      // Function to initialize the map and add route
+      const initializeMap = async () => {
+        if (mapRef.current) {
+          mapRef.current.remove(); // Clear existing map instance
+        }
 
-      // Geocoding function using Nominatim
-      function geocode(address) {
-        return new Promise((resolve, reject) => {
-          L.Control.Geocoder.nominatim().geocode(address, function (results) {
-            if (results && results.length > 0) {
-              resolve(results[0].center); // Return the first matching result
-            } else {
-              reject(`Aucun résultat trouvé pour "${address}"`);
-            }
-          });
-        });
-      }
+        // Create map instance
+        mapRef.current = L.map('map').setView([48.8566, 2.3522], 6); // Centered on France
 
-      // Event listener for the button
-      document.getElementById('calculateRoute').addEventListener('click', async function () {
-        var StartingPoint = document.getElementById('start').value;
-        var EndPoint = document.getElementById('end').value;
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+        }).addTo(mapRef.current);
 
         try {
-          // Geocode the start and end addresses
-          var startCoords = await geocode(StartingPoint);
-          var endCoords = await geocode(EndPoint);
+          // Geocode start and end points
+          const geocode = (address) => new Promise((resolve, reject) => {
+            L.Control.Geocoder.nominatim().geocode(address, (results) => {
+              if (results && results.length > 0) resolve(results[0].center);
+              else reject(`Could not find location: "${address}"`);
+            });
+          });
 
-          // Remove previous route if it exists
-          if (routingControl) {
-            map.removeControl(routingControl);
-          }
+          const startCoords = await geocode(startPoint);
+          const endCoords = await geocode(endPoint);
 
-          // Add the routing control with the geocoded coordinates
-          routingControl = L.Routing.control({
+          // Add route
+          const routingControl = L.Routing.control({
             waypoints: [
               L.latLng(startCoords.lat, startCoords.lng),
               L.latLng(endCoords.lat, endCoords.lng)
             ],
             routeWhileDragging: true
-          }).addTo(map);
+          }).addTo(mapRef.current);
+
+          routingControl.on('routesfound', function (e) {
+            const route = e.routes[0];
+            const distance = (route.summary.totalDistance / 1000).toFixed(2); // Convert to km
+            const time = (route.summary.totalTime / 3600).toFixed(2); // Convert to hours
+            setTripDetails({ distance, time });
+          });
         } catch (error) {
-          alert(error); // Display an error message if geocoding fails
+          alert(error);
         }
-      });
-    </script>
-  </body>
+      };
+
+      return (
+        <div style={{ height: '100%', width: '100%' }}>
+          <div className="container">
+            <div className="inputContainer">
+              <label className="label">Start point</label>
+              <input
+                className="input"
+                type="text"
+                value={startPoint}
+                onChange={(e) => setStartPoint(e.target.value)}
+                placeholder="Enter start point"
+              />
+            </div>
+
+            <div className="inputContainer">
+              <label className="label">End point</label>
+              <input
+                className="input"
+                type="text"
+                value={endPoint}
+                onChange={(e) => setEndPoint(e.target.value)}
+                placeholder="Enter end point"
+              />
+            </div>
+
+            <div className="inputContainer">
+              <label className="label">Cuisine type</label>
+              <select
+                className="input"
+                value={cuisineType}
+                onChange={(e) => setCuisineType(e.target.value)}
+              >
+                <option value="" disabled>Select cuisine</option>
+                <option value="Fast-Food">Italian</option>
+                <option value="Italian">Italian</option>
+                <option value="Chinese">Chinese</option>
+                <option value="Indian">Indian</option>
+                <option value="Mexican">Mexican</option>
+              </select>
+            </div>
+
+            <div className="inputContainer">
+              <label className="label">Departure time</label>
+              <input
+                className="input"
+                type="time"
+                value={departureTime}
+                onChange={(e) => setDepartureTime(e.target.value)}
+              />
+            </div>
+
+            <div className="inputContainer">
+              <label className="label">When you want to eat</label>
+              <input
+                className="input"
+                type="time"
+                value={whenToEat}
+                onChange={(e) => setWhenToEat(e.target.value)}
+              />
+            </div>
+
+            <button className="goButton" onClick={initializeMap}>
+              GO
+            </button>
+
+            {tripDetails.distance && tripDetails.time && (
+              <div className="tripDetails">
+                <p>Distance: {tripDetails.distance} km</p>
+                <p>Estimated time: {tripDetails.time} hours</p>
+              </div>
+            )}
+          </div>
+
+          <div id="map" style={{ height: '100%' }}></div>
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<RoutingApp />);
+  </script>
+</body>
 </html>
