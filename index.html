@@ -5,36 +5,94 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
     <style>
       html, body {
         height: 100%;
         padding: 0;
         margin: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      #controls {
+        padding: 10px;
+        background-color: #f9f9f9;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        z-index: 1000;
       }
       #map {
-        /* configure the size of the map */
+        flex: 1;
         width: 100%;
-        height: 100%;
       }
     </style>
   </head>
   <body>
+    <div id="controls">
+      <label>
+        StartingPoint : 
+        <input type="text" id="start"/>
+      </label>
+      <label>
+        EndPoint : 
+        <input type="text" id="end"/>
+      </label>
+      <button id="calculateRoute">Itinéraire</button>
+    </div>
     <div id="map"></div>
     <script>
-      // initialize Leaflet
-      var map = L.map('map').setView({lon: 0, lat: 0}, 2);
+      // Initialize the map
+      var map = L.map('map').setView([48.8566, 2.3522], 6); // Centré sur la France
 
-      // add the OpenStreetMap tiles
+      // Add OpenStreetMap tiles
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
       }).addTo(map);
 
-      // show the scale bar on the lower left corner
-      L.control.scale({imperial: true, metric: true}).addTo(map);
+      // Routing control variable
+      var routingControl;
 
-      // show a marker on the map
-      L.marker({lon: 0, lat: 0}).bindPopup('The center of the world').addTo(map);
+      // Geocoding function using Nominatim
+      function geocode(address) {
+        return new Promise((resolve, reject) => {
+          L.Control.Geocoder.nominatim().geocode(address, function (results) {
+            if (results && results.length > 0) {
+              resolve(results[0].center); // Return the first matching result
+            } else {
+              reject(`Aucun résultat trouvé pour "${address}"`);
+            }
+          });
+        });
+      }
+
+      // Event listener for the button
+      document.getElementById('calculateRoute').addEventListener('click', async function () {
+        var StartingPoint = document.getElementById('start').value;
+        var EndPoint = document.getElementById('end').value;
+
+        try {
+          // Geocode the start and end addresses
+          var startCoords = await geocode(StartingPoint);
+          var endCoords = await geocode(EndPoint);
+
+          // Remove previous route if it exists
+          if (routingControl) {
+            map.removeControl(routingControl);
+          }
+
+          // Add the routing control with the geocoded coordinates
+          routingControl = L.Routing.control({
+            waypoints: [
+              L.latLng(startCoords.lat, startCoords.lng),
+              L.latLng(endCoords.lat, endCoords.lng)
+            ],
+            routeWhileDragging: true
+          }).addTo(map);
+        } catch (error) {
+          alert(error); // Display an error message if geocoding fails
+        }
+      });
     </script>
   </body>
 </html>
