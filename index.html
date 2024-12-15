@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TripEase</title>
+  <link rel="icon" href="TripEase.png" type="image/png">
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
@@ -47,14 +48,15 @@
     }
     .input {
       width: 100%;
-      padding: 8px;
+      padding: 8px 0px;
       border-radius: 5px;
       border: 1px solid #ccc;
       font-size: 14px;
+      text-align: center;
     }
     .goButton {
       margin-top: 10px;
-      padding: 8px 20px;
+      padding: 8px 140px;
       border-radius: 5px;
       background-color: #4CAF50;
       color: #fff;
@@ -159,6 +161,33 @@
         }
       };
 
+      const setDeviceLocation = () => {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition((position) => {
+            const { latitude, longitude } = position.coords;
+            setStartPoint(`${latitude}, ${longitude}`);
+          }, (error) => {
+            alert("Error getting location: " + error.message);
+          });
+        } else {
+          alert("Geolocation is not supported by this browser.");
+        }
+      };
+
+      const placeStartPointOnMap = () => {
+        mapRef.current.once('click', (e) => {
+          const { lat, lng } = e.latlng;
+          setStartPoint(`${lat}, ${lng}`);
+        });
+      };
+
+      const placeEndPointOnMap = () => {
+        mapRef.current.once('click', (e) => {
+          const { lat, lng } = e.latlng;
+          setEndPoint(`${lat}, ${lng}`);
+        });
+      };
+
       return (
         <div style={{ height: '100%', width: '100%' }}>
           <div className="container">
@@ -171,6 +200,8 @@
                 onChange={(e) => setStartPoint(e.target.value)}
                 placeholder="Enter start point"
               />
+              <button onClick={setDeviceLocation}>Use Device Location</button>
+              <button onClick={placeStartPointOnMap}>Place on Map</button>
             </div>
 
             <div className="inputContainer">
@@ -182,6 +213,7 @@
                 onChange={(e) => setEndPoint(e.target.value)}
                 placeholder="Enter end point"
               />
+              <button onClick={placeEndPointOnMap}>Place on Map</button>
             </div>
 
             <div className="inputContainer">
