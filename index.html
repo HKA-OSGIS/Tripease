@@ -42,7 +42,7 @@
     }
     .label {
       display: block;
-      margin-bottom: 5px;
+      margin-bottom: 0px;
       font-size: 14px;
       font-weight: bold;
     }
@@ -88,9 +88,10 @@
         return `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
       });
       const [whenToEat, setWhenToEat] = React.useState("");
-      const [tripDetails, setTripDetails] = React.useState({ distance: "", time: "" });
+      const [tripDetails, setTripDetails] = React.useState({ distance: "", time: "", halfwayDist: "", halfwayTime: "", halfwayCoords: "" });
       const mapRef = React.useRef(null);
       const routingControlRef = React.useRef(null);
+      const halfwayMarkerRef = React.useRef(null);
 
       React.useEffect(() => {
         // Initialize the map
@@ -114,6 +115,9 @@
         if (routingControlRef.current) {
           mapRef.current.removeControl(routingControlRef.current); // Clear existing route
         }
+        if (halfwayMarkerRef.current) {
+          mapRef.current.removeLayer(halfwayMarkerRef.current); // Remove existing halfway marker
+        }
 
         try {
           // Geocode start and end points
@@ -132,11 +136,12 @@
             waypoints: [
               L.latLng(startCoords.lat, startCoords.lng),
               L.latLng(endCoords.lat, endCoords.lng)
-            ],routeWhileDragging: true,
+            ],
+            routeWhileDragging: true,
             show: false,
           }).addTo(mapRef.current);
 
-          routingControlRef.current.on('routesfound', function (e) {
+          routingControlRef.current.on('routesfound', async function (e) {
             const route = e.routes[0];
             const distance = (route.summary.totalDistance / 1000).toFixed(2); // Convert to km
             const time = route.summary.totalTime / 3600; // Travel time in hours as a decimal
@@ -157,7 +162,44 @@
             // Format arrival time as "XhYY"
             const formattedArrival = `${arriveHours}h${String(arriveMinutes).padStart(2, '0')}`;
 
-            setTripDetails({ distance, time: formattedTime, arrive: formattedArrival });
+            // Calculate halfway point
+            const halfwayDist = (route.summary.totalDistance / 2000).toFixed(2); // Half distance in km
+            const halfwayIndex = Math.floor(route.coordinates.length / 2);
+            const halfwayCoords = route.coordinates[halfwayIndex];
+
+            // Add a marker for the halfway point
+            halfwayMarkerRef.current = L.marker(halfwayCoords).addTo(mapRef.current);
+
+            // Calculate travel time to the halfway point
+            const halfwayTime = await new Promise((resolve) => {
+              const halfwayRouting = L.Routing.control({
+                waypoints: [
+                  L.latLng(startCoords.lat, startCoords.lng),
+                  L.latLng(halfwayCoords.lat, halfwayCoords.lng)
+                ],
+                createMarker: () => null, // Prevent adding extra markers
+                show: false,
+              });
+
+              halfwayRouting.on('routesfound', (halfwayRouteEvent) => {
+                const halfwayRoute = halfwayRouteEvent.routes[0];
+                const time = halfwayRoute.summary.totalTime / 3600; // Time in hours as decimal
+                const travelHours = Math.floor(time);
+                const travelMinutes = Math.round((time - travelHours) * 60);
+                resolve(`${travelHours}h${String(travelMinutes).padStart(2, '0')}`);
+              });
+
+              halfwayRouting.addTo(mapRef.current);
+            });
+
+            setTripDetails({
+              distance,
+              time: formattedTime,
+              arrive: formattedArrival,
+              halfwayDist,
+              halfwayCoords: `${halfwayCoords.lat}, ${halfwayCoords.lng}`,
+              halfwayTime,
+            });
           });
         } catch (error) {
           alert(error);
@@ -264,6 +306,9 @@
                 <p>Distance: {tripDetails.distance} km</p>
                 <p>Estimated time: {tripDetails.time} hours</p>
                 <p>Estimated time of arrival: {tripDetails.arrive} hours</p>
+                <p>Halfway distance: {tripDetails.halfwayDist} km</p>
+                <p>Halfway point: {tripDetails.halfwayCoords}</p>
+                <p>Time to halfway: {tripDetails.halfwayTime}</p>
               </div>
             )}
           </div>
