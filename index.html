@@ -88,10 +88,9 @@
         return `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
       });
       const [whenToEat, setWhenToEat] = React.useState("");
-      const [tripDetails, setTripDetails] = React.useState({ distance: "", time: "", halfwayDist: "", halfwayTime: "", halfwayCoords: "" });
+      const [tripDetails, setTripDetails] = React.useState({ distance: "", time: "" });
       const mapRef = React.useRef(null);
       const routingControlRef = React.useRef(null);
-      const halfwayMarkerRef = React.useRef(null);
 
       React.useEffect(() => {
         // Initialize the map
@@ -111,12 +110,44 @@
         };
       }, []);
 
+      const calculateMidpointDetails = async (distance) => {
+        const routeSegments = routingControlRef.current.getPlan()._routes[0].coordinates;
+        const halfwayIndex = Math.floor(routeSegments.length * (distance / tripDetails.distance));
+        const halfwayCoords = routeSegments[halfwayIndex];
+        const travelTimeToHalfway = routingControlRef.current.getPlan()._routes[0].instructions.slice(0, halfwayIndex).reduce((acc, cur) => acc + cur.time, 0);
+        return { halfwayCoords, travelTimeToHalfway };
+      };
+
+      const findRestaurantDistance = async () => {
+        let minDist = 0; // km
+        let maxDist = tripDetails.distance;
+        let iterations = 0;
+
+        while (true) {
+          const halfwayDist = (minDist + maxDist) / 2;
+          const { halfwayCoords, travelTimeToHalfway } = await calculateMidpointDetails(halfwayDist);
+
+          const timeDifference = Math.abs(whenToEat - travelTimeToHalfway);
+
+          if (timeDifference <= 15) {
+            setTripDetails((prev) => ({ ...prev, halfwayCoords, halfwayDist, halfwayTime: travelTimeToHalfway }));
+            alert(`Found in ${iterations} iterations`);
+            break;
+          }
+
+          if (travelTimeToHalfway > whenToEat) {
+            maxDist = halfwayDist;
+          } else {
+            minDist = halfwayDist;
+          }
+
+          iterations++;
+        }
+      };
+
       const initializeRoute = async () => {
         if (routingControlRef.current) {
           mapRef.current.removeControl(routingControlRef.current); // Clear existing route
-        }
-        if (halfwayMarkerRef.current) {
-          mapRef.current.removeLayer(halfwayMarkerRef.current); // Remove existing halfway marker
         }
 
         try {
@@ -162,44 +193,7 @@
             // Format arrival time as "XhYY"
             const formattedArrival = `${arriveHours}h${String(arriveMinutes).padStart(2, '0')}`;
 
-            // Calculate halfway point
-            const halfwayDist = (route.summary.totalDistance / 2000).toFixed(2); // Half distance in km
-            const halfwayIndex = Math.floor(route.coordinates.length / 2);
-            const halfwayCoords = route.coordinates[halfwayIndex];
-
-            // Add a marker for the halfway point
-            halfwayMarkerRef.current = L.marker(halfwayCoords).addTo(mapRef.current);
-
-            // Calculate travel time to the halfway point
-            const halfwayTime = await new Promise((resolve) => {
-              const halfwayRouting = L.Routing.control({
-                waypoints: [
-                  L.latLng(startCoords.lat, startCoords.lng),
-                  L.latLng(halfwayCoords.lat, halfwayCoords.lng)
-                ],
-                createMarker: () => null, // Prevent adding extra markers
-                show: false,
-              });
-
-              halfwayRouting.on('routesfound', (halfwayRouteEvent) => {
-                const halfwayRoute = halfwayRouteEvent.routes[0];
-                const time = halfwayRoute.summary.totalTime / 3600; // Time in hours as decimal
-                const travelHours = Math.floor(time);
-                const travelMinutes = Math.round((time - travelHours) * 60);
-                resolve(`${travelHours}h${String(travelMinutes).padStart(2, '0')}`);
-              });
-
-              halfwayRouting.addTo(mapRef.current);
-            });
-
-            setTripDetails({
-              distance,
-              time: formattedTime,
-              arrive: formattedArrival,
-              halfwayDist,
-              halfwayCoords: `${halfwayCoords.lat}, ${halfwayCoords.lng}`,
-              halfwayTime,
-            });
+            setTripDetails({ distance, time: formattedTime, arrive: formattedArrival });
           });
         } catch (error) {
           alert(error);
@@ -301,14 +295,22 @@
               GO
             </button>
 
+            <button className="goButton" onClick={findRestaurantDistance}>
+              Find Restaurant Distance
+            </button>
+
             {tripDetails.distance && tripDetails.time && (
               <div className="tripDetails">
                 <p>Distance: {tripDetails.distance} km</p>
                 <p>Estimated time: {tripDetails.time} hours</p>
                 <p>Estimated time of arrival: {tripDetails.arrive} hours</p>
-                <p>Halfway distance: {tripDetails.halfwayDist} km</p>
-                <p>Halfway point: {tripDetails.halfwayCoords}</p>
-                <p>Time to halfway: {tripDetails.halfwayTime}</p>
+                {tripDetails.halfwayCoords && (
+                  <div>
+                    <p>Halfway Distance: {tripDetails.halfwayDist} km</p>
+                    <p>Halfway Time: {tripDetails.halfwayTime} minutes</p>
+                    <p>Halfway Coordinates: {tripDetails.halfwayCoords.lat}, {tripDetails.halfwayCoords.lng}</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
