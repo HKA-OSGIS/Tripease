@@ -83,7 +83,10 @@
       const [startPoint, setStartPoint] = React.useState("");
       const [endPoint, setEndPoint] = React.useState("");
       const [cuisineType, setCuisineType] = React.useState("");
-      const [departureTime, setDepartureTime] = React.useState("");
+      const [departureTime, setDepartureTime] = React.useState(() => {
+        const now = new Date();
+        return `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+      });
       const [whenToEat, setWhenToEat] = React.useState("");
       const [tripDetails, setTripDetails] = React.useState({ distance: "", time: "" });
       const mapRef = React.useRef(null);
