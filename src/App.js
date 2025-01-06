@@ -73,7 +73,7 @@ const RoutingApp = () => {
    return getDistance({ latitude: x, longitude: y}, {latitude: x1, longitude: y1});
   }
 
-  function closestRestaurant(point) {
+  function closestRestaurant(point, x) {
     return fetch("./restaurants.geojson")
       .then(response => response.json())
       .then(data => {
@@ -85,27 +85,23 @@ const RoutingApp = () => {
             }
           }
         });
-        let closest = {};
-        filtered.forEach((e) => {
-          if (Object.keys(closest).length === 0) {
-            closest = e;
-            return;
+
+        filtered.sort(function(a, b){return (dist(a, point) - dist(b, point))})  //sort by ascending dist
+        let closest = filtered.slice(0, x) //take the x first value
+
+        closest.forEach((e) => {
+          let x, y;
+          if (e.geometry.type === "Polygon") {
+            x = e.geometry.coordinates[0][0][1];
+            y = e.geometry.coordinates[0][0][0];
+          } else {
+            x = e.geometry.coordinates[1];
+            y = e.geometry.coordinates[0];
           }
-          if (dist(e, point) < dist(closest, point)) {
-            closest = e;
-          }
+          const m = L.marker([x, y], { icon: restaurantIcon }).addTo(map.current);
+          m.bindPopup(JSON.stringify(closest));
         });
-        let x, y;
-        if (closest.geometry.type === "Polygon") {
-          x = closest.geometry.coordinates[0][0][1];
-          y = closest.geometry.coordinates[0][0][0];
-        } else {
-          x = closest.geometry.coordinates[1];
-          y = closest.geometry.coordinates[0];
-        }
-        const m = L.marker([x, y], { icon: restaurantIcon }).addTo(map.current);
-        m.bindPopup(JSON.stringify(closest));
-        return { lat: x, lng: y };
+        return closest;
       })
   }
 
@@ -226,7 +222,7 @@ const RoutingApp = () => {
           return true
 				})
         L.marker([new_coord.lat, new_coord.lng], {icon: startIcon}).addTo(map.current);
-        let nearestaurant = closestRestaurant(new_coord)
+        let nearestaurant = closestRestaurant(new_coord, 3)
         console.log(nearestaurant)
 
         const routingContainer = document.querySelector('.leaflet-routing-container');
