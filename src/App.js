@@ -99,7 +99,9 @@ const RoutingApp = () => {
             y = e.geometry.coordinates[0];
           }
           const m = L.marker([x, y], { icon: restaurantIcon }).addTo(map.current);
-          m.bindPopup(JSON.stringify(closest));
+          let info = "Restaurant name : " + e.properties.name + "</b><br> Distance : " + dist(e, point)/1000 + " km"
+          //m.bindPopup(JSON.stringify(closest)).openPopup();
+          m.bindPopup(info).openPopup();
         });
         return closest;
       })
