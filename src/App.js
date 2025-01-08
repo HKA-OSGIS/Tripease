@@ -98,10 +98,10 @@ const RoutingApp = () => {
             x = e.geometry.coordinates[1];
             y = e.geometry.coordinates[0];
           }
-          const m = L.marker([x, y], { icon: restaurantIcon }).addTo(map.current);
-          let info = "Restaurant name : " + e.properties.name + "</b><br> Distance : " + dist(e, point)/1000 + " km"
+          const restomarker = L.marker([x, y], { icon: restaurantIcon }).addTo(map.current);
+          let info = "Restaurant name : " + e.properties.name + "</b><br> Distance : " + dist(e, point)/1000 + " km </b><br> Restaurant type : " + e.properties.cuisine 
           //m.bindPopup(JSON.stringify(closest)).openPopup();
-          m.bindPopup(info).openPopup();
+          restomarker.bindPopup(info).openPopup();
         });
         return closest;
       })
@@ -165,9 +165,11 @@ const RoutingApp = () => {
         ],
         createMarker: function(i, wp, nWps) {
           if (i === 0) {
-              return L.marker(wp.latLng, {icon: startIcon });
+            const startmarker = L.marker(wp.latLng, {icon: startIcon })
+            return startmarker;
           } else if (i === nWps - 1){
-              return L.marker(wp.latLng, {icon: endIcon });
+            const endmarker = L.marker(wp.latLng, {icon: endIcon })
+            return endmarker;
           }
         },
         lineOptions: {
@@ -179,7 +181,7 @@ const RoutingApp = () => {
         const route = e.routes[0];
         const summary = route.summary;
         setTripDetails({
-          distance: (summary.totalDistance / 1000).toFixed(2),  //Distance in km with 2 decimals
+          distance: (summary.totalDistance / 1000).toFixed(2),
           time: timeToHours(summary.totalTime),
           arrive: timeToHours(timetoSecond(departureTime) + summary.totalTime)
         });
@@ -223,7 +225,7 @@ const RoutingApp = () => {
           console.log("new coord1 :", new_coord)
           return true
 				})
-        L.marker([new_coord.lat, new_coord.lng], {icon: startIcon}).addTo(map.current);
+        const halfmarker = L.circle([new_coord.lat, new_coord.lng], 100).addTo(map.current);
         let nearestaurant = closestRestaurant(new_coord, 3)
         console.log(nearestaurant)
 
@@ -267,7 +269,8 @@ const RoutingApp = () => {
               const lat = e.splitsplit(',')[0]
               const lng  = e.splitsplit(',')[1]
               setEndPoint({ lat: lat, lng: lng })
-            }}            placeholder="Enter end point"
+            }}
+            placeholder="Enter end point"
           />
           <button onClick={placeEndPointOnMap}>Place on Map</button>
         </div>
