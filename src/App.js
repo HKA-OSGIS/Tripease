@@ -3,6 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine';
 import 'leaflet-control-geocoder';
+import osmtogeojson from 'osmtogeojson';
 import './App.css';
 import { getDistance } from 'geolib';
 
@@ -73,38 +74,44 @@ const RoutingApp = () => {
    return getDistance({ latitude: x, longitude: y}, {latitude: x1, longitude: y1});
   }
 
-  function closestRestaurant(point, x) {
-    return fetch("./restaurants.geojson")
-      .then(response => response.json())
-      .then(data => {
-        let filtered = [];
-        data.features.forEach((e) => {
-          if (typeof(e.properties.cuisine) === 'string') {
-            if (e.properties.cuisine.includes(cuisineType)) {
-              filtered.push(e);
-            }
-          }
-        });
+  async function closestRestaurant(point, x) {
+    let url = new URL("https://overpass-api.de/api/interpreter");
+    url.searchParams.append(
+      "data",
+      "[out:json];nwr[amenity=restaurant](around:2000," + point.lat + "," + point.lng + "); out;"
+    );    
+    let response = await fetch(url);
+    let osmdata = await response.json();
+    let geojson = osmtogeojson(osmdata);
 
-        filtered.sort(function(a, b){return (dist(a, point) - dist(b, point))})  //sort by ascending dist
-        let closest = filtered.slice(0, x) //take the x first value
+    let filtered = [];
+    geojson.features.forEach((e) => {
+      if (typeof(e.properties.cuisine) === 'string') {
+        if (e.properties.cuisine.includes(cuisineType)) {
+          filtered.push(e);
+        }
+      }
+    });
 
-        closest.forEach((e) => {
-          let x, y;
-          if (e.geometry.type === "Polygon") {
-            x = e.geometry.coordinates[0][0][1];
-            y = e.geometry.coordinates[0][0][0];
-          } else {
-            x = e.geometry.coordinates[1];
-            y = e.geometry.coordinates[0];
-          }
-          const restomarker = L.marker([x, y], { icon: restaurantIcon }).addTo(map.current);
-          let info = "Restaurant name : " + e.properties.name + "</b><br> Distance : " + dist(e, point)/1000 + " km </b><br> Restaurant type : " + e.properties.cuisine 
-          //m.bindPopup(JSON.stringify(closest)).openPopup();
-          restomarker.bindPopup(info).openPopup();
-        });
-        return closest;
-      })
+    filtered.sort(function(a, b){return (dist(a, point) - dist(b, point))})  //sort by ascending dist
+    let closest = filtered.slice(0, x) //take the x first value
+
+    closest.forEach((e) => {
+      let x, y;
+      if (e.geometry.type === "Polygon") {
+        x = e.geometry.coordinates[0][0][1];
+        y = e.geometry.coordinates[0][0][0];
+      } else {
+        x = e.geometry.coordinates[1];
+        y = e.geometry.coordinates[0];
+      }
+
+      const restomarker = L.marker([x, y], { icon: restaurantIcon }).addTo(map.current);
+      let info = "Restaurant name : " + e.properties.name + "</b><br> Distance : " + dist(e, point)/1000 + " km </b><br> Restaurant type : " + e.properties.cuisine 
+      //m.bindPopup(JSON.stringify(closest)).openPopup();
+      restomarker.bindPopup(info).openPopup();
+    });
+    return closest;
   }
 
   const placeStartPointOnMap = () => {
@@ -222,12 +229,11 @@ const RoutingApp = () => {
           new_coord = coord
           dist_coord += getDistance({latitude: old_coord.lat, longitude: old_coord.lng},{latitude: new_coord.lat, longitude: new_coord.lng})
           old_coord = new_coord
-          console.log("new coord1 :", new_coord)
           return true
 				})
         const halfmarker = L.circle([new_coord.lat, new_coord.lng], 100).addTo(map.current);
         let nearestaurant = closestRestaurant(new_coord, 3)
-        console.log(nearestaurant)
+        //console.log(nearestaurant)
 
         const routingContainer = document.querySelector('.leaflet-routing-container');
         if (routingContainer) {
