@@ -16,7 +16,7 @@ const RoutingApp = () => {
     return `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
   });
   const [whenToEat, setWhenToEat] = useState("");
-  const [tripDetails, setTripDetails] = useState({ distance: "", time: "", arrive: "" });
+  const [tripDetails, setTripDetails] = useState({ distance: "", time: "", arrive: "", diner: ""});
   const map = useRef(null);
   const routingControlRef = useRef(null);
   const restomarkerlist = useRef([]);
@@ -198,12 +198,8 @@ const RoutingApp = () => {
           arrive: timeToHours(timetoSecond(departureTime) + summary.totalTime)
         });
 
-
-        /* ----------------------------
-        Estimate the coordinate of the whenToEat point
-        ---------------------------- */
         let time_travel = 0
-        let distance_travel = 0 // && timetoSecond(departureTime)+summary.time > timetoSecond(whenToEat)  PB
+        let distance_travel = 0
         let li_dist, li_time, t_resto, d_resto, dt_resto= 0
         if (timetoSecond(departureTime) < timetoSecond(whenToEat)) {
 
@@ -212,7 +208,7 @@ const RoutingApp = () => {
               t_resto = time_travel - (timetoSecond(whenToEat) - (timetoSecond(departureTime)))
               d_resto = (li_dist * t_resto) / li_time // Calculate the exact distance to reach the point whenToEat
               dt_resto = d_resto + distance_travel
-              return false //Stop the for loop
+              return false
             }
             li_dist = instruction.distance
             li_time = instruction.time
@@ -220,27 +216,31 @@ const RoutingApp = () => {
             distance_travel += li_dist
             return true
           });
-        } else {
-          console.log("not a good time to eat")
-        }
 
-        let dist_coord = 0
-        let old_coord = startPoint
-        let new_coord = startPoint
-        route.coordinates.forEach(function (coord) {
-          if (dist_coord > dt_resto) {
-            return false
-          } 
-          new_coord = coord
-          dist_coord += getDistance({latitude: old_coord.lat, longitude: old_coord.lng},{latitude: new_coord.lat, longitude: new_coord.lng})
-          old_coord = new_coord
-          return true
-				})
-        if (circlemarker.current) {
+          let dist_coord = 0
+          let old_coord = startPoint
+          let new_coord = startPoint
+          route.coordinates.forEach(function (coord) {
+            if (dist_coord > dt_resto) {
+              return false
+            } 
+            new_coord = coord
+            dist_coord += getDistance({latitude: old_coord.lat, longitude: old_coord.lng},{latitude: new_coord.lat, longitude: new_coord.lng})
+            old_coord = new_coord
+            return true
+          })
+          if (circlemarker.current) {
           map.current.removeControl(circlemarker.current)
+          }
+          circlemarker.current = L.circle([new_coord.lat, new_coord.lng], { radius: 100}).addTo(map.current);
+
+          let nearestaurant = closestRestaurant(new_coord, 3)
+        } else {
+          setTripDetails((oldDetails) => ({
+            ...oldDetails,
+            diner: "No restaurant search"
+          }));
         }
-        circlemarker.current = L.circle([new_coord.lat, new_coord.lng], { radius: 100}).addTo(map.current);
-        let nearestaurant = closestRestaurant(new_coord, 3)
 
         const routingContainer = document.querySelector('.leaflet-routing-container');
         if (routingContainer) {
@@ -295,7 +295,7 @@ const RoutingApp = () => {
             value={cuisineType}
             onChange={(e) => setCuisineType(e.target.value)}
           >
-            <option value="" disabled>Select cuisine</option>
+            <option value="" disabled>No preference</option>
             <option value="regional">Regional</option>
             <option value="italian">Italian</option>
             <option value="chinese">Chinese</option>
@@ -334,6 +334,7 @@ const RoutingApp = () => {
             <p>Distance: {tripDetails.distance} km</p>
             <p>Estimated time: {tripDetails.time.hours}:{tripDetails.time.minutes}:{tripDetails.time.secondes}s</p>
             <p>Estimated time of arrival: {tripDetails.arrive.hours}:{tripDetails.arrive.minutes}:{tripDetails.arrive.secondes}s</p>
+            <p><b>{tripDetails.diner}</b></p>
           </div>
         )}
       </div>
