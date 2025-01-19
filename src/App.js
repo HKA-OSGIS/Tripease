@@ -240,6 +240,10 @@ const RoutingApp = () => {
             ...oldDetails,
             diner: "No restaurant search"
           }));
+          if (circlemarker.current) {
+            map.current.removeControl(circlemarker.current)
+          }
+          restomarkerlist.current.forEach(e =>map.current.removeControl(e));
         }
 
         const routingContainer = document.querySelector('.leaflet-routing-container');
